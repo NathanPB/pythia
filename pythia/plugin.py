@@ -20,6 +20,31 @@ class PluginHook(Enum):
     post_run_all = 700
     pre_analytics = 800
     post_analytics = 900
+    """
+    Triggered after the analytics runs are completed.
+    
+    :param config: The configuration file.
+    :type config: dict
+    
+    :param run_outputs: List of file paths pointing to the .csv outputs of the runs
+           (deprecated, use analytics_files["run_outputs"]).
+    :type run_outputs: list[str]
+    
+    :param calculated: List of file paths pointing to the .csv outputs of the runs,with the calculated columns
+           (deprecated, use analytics_files["calculated"]).
+    :type calculated: list[str]
+    
+    :param filtered: List of file paths pointing to the filtered .csv outputs of the runs
+           (deprecated, use analytics_files["filtered"]).
+    :type filtered: list[str]
+    
+    :param analytics_files: A dictionary containing file paths to the .csv outputs of the analytics runs. 
+                            Keys includes, but are not limited to "run_outputs", "calculated", and "filtered".
+                            - "run_outputs" lists paths to the raw .csv outputs of the runs (deprecated).
+                            - "calculated" lists paths to the .csv outputs with calculated columns (deprecated).
+                            - "filtered" lists paths to the .csv outputs that have been filtered.
+    :type analytics_files: dict[str, list[str]]
+    """
 
 
 def register_plugin_function(hook, fun, config, plugins):

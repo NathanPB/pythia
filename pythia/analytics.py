@@ -289,4 +289,9 @@ def execute(config, plugins):
         run_outputs=run_outputs,
         calculated=calculated,
         filtered=filtered,
+        analytics_files={
+            "run_outputs": run_outputs,
+            "calculated": calculated,
+            "filtered": filtered
+        }
     )
