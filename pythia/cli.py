@@ -2,6 +2,7 @@ import argparse
 import datetime
 import logging
 import os
+import sys
 
 import pythia.config
 import pythia.dssat
@@ -9,6 +10,8 @@ import pythia.analytics
 import pythia.io
 import pythia.peerless
 import pythia.plugin
+from pythia.plugin.hooks import PostConfigHookPayload
+from pythia.plugin import PluginManager
 
 
 def main():
@@ -70,10 +73,16 @@ def main():
                     shutil.rmtree(config["workDir"])
 
             config["exportRunlist"] = args.export_runlist
-            plugins = pythia.plugin.load_plugins(config, {})
-            config = pythia.plugin.run_plugin_functions(
-                pythia.plugin.PluginHook.post_config, plugins, full_config=config
-            ).get("full_config", config)
+
+            plugin_logger = logging.getLogger(PluginManager.__name__)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setFormatter(formatter)
+            plugin_logger.setLevel(logging.INFO)
+            plugin_logger.addHandler(handler)
+            plugins = PluginManager(config, plugin_logger)
+            plugins.notify_hook(PostConfigHookPayload(config))
+
             if args.quiet:
                 config["silence"] = True
             else:

@@ -1,45 +1,62 @@
-import logging
-from pythia.plugin import PluginHook, register_plugin_function
+from logging import Logger
+from typing import Dict
+from pythia.plugin import PythiaPlugin, HookRegisterer
+from pythia.plugin.hooks import PostConfigHookPayload, PostBuildContextHookPayload, \
+    PostPeerlessPixelSuccessHookPayload, PostPeerlessPixelSkipHookPayload, \
+    PostRunPixelSuccessHookPayload, PostRunPixelFailedHookPayload
 
 
-def initialize(config, plugins, full_config):
-    logging.info("[TEST PLUGIN] Initializing plugin")
-    plugins = register_plugin_function(PluginHook.post_config, sample_function, config, plugins)
-    plugins = register_plugin_function(PluginHook.post_build_context, contexted_function, config, plugins)
-    plugins = register_plugin_function(PluginHook.post_peerless_pixel_success, on_peerless_success, config, plugins)
-    plugins = register_plugin_function(PluginHook.post_peerless_pixel_skip, on_peerless_skip, config, plugins)
-    plugins = register_plugin_function(PluginHook.post_run_pixel_success, on_run_pixel_success, config, plugins)
-    plugins = register_plugin_function(PluginHook.post_run_pixel_failed, on_run_pixel_failed, config, plugins)
-    return plugins
+class TestPluginEntryPoint(PythiaPlugin):
+    logger: Logger
 
+    def initialize(
+            self,
+            pythia_config: Dict,
+            plugin_config: Dict,
+            hook_registerer: HookRegisterer,
+            logger: Logger
+    ):
+        self.logger = logger
 
-def sample_function(config={}, **kwargs):
-    retval = config.get("value", 1)
-    logging.info("[TEST PLUGIN] Running the sample_function()")
-    return {**kwargs, "config": config, "retval": retval}
+        self.logger.info("Initializing plugin")
+        hook_registerer(PostConfigHookPayload, self.sample_function)
+        hook_registerer(PostConfigHookPayload, self.duplicate_hook)
+        hook_registerer(PostBuildContextHookPayload, self.contexted_function)
+        hook_registerer(PostPeerlessPixelSuccessHookPayload, self.on_peerless_success)
+        hook_registerer(PostPeerlessPixelSkipHookPayload, self.on_peerless_skip)
+        hook_registerer(PostRunPixelSuccessHookPayload, self.on_run_pixel_success)
+        hook_registerer(PostRunPixelFailedHookPayload, self.on_run_pixel_failed)
 
+        # Demonstration of what happens when the plugin crashes on initialization
+        if plugin_config["params"].get("raise_init", False):
+            raise Exception("Testing plugin exception")
 
-def contexted_function(context={}, **kwargs):
-    logging.info("[TEST PLUGIN] Running the contexted_function()")
-    context["context_value"] = context.get("context_value", 2) + 1
-    return {**kwargs, "context": context}
+        # Demonstration of what happens when a plugin hook crashes
+        if plugin_config["params"].get("raise_hook", False):
+            hook_registerer(PostConfigHookPayload, self.problematic_hook)
 
+    def sample_function(self, payload: PostConfigHookPayload, config: Dict) -> None:
+        self.logger.info("Running the sample_function()")
+        config["sample_value"] = 1
 
-def on_peerless_success(*args, **kwargs):
-    logging.info("[TEST PLUGIN] peerless success")
-    return kwargs
+    def duplicate_hook(self, payload: PostConfigHookPayload, config: Dict) -> None:
+        self.logger.info("PostConfigHookPayload was registered twice, no problems :)")
 
+    def contexted_function(self, payload: PostBuildContextHookPayload, config: Dict) -> None:
+        self.logger.info("Running the contexted_function()")
+        payload.context["incrementing"] = payload.context.get("incrementing", 0) + 1
 
-def on_peerless_skip(*args, **kwargs):
-    logging.info("[TEST PLUGIN] peerless skip")
-    return kwargs
+    def on_peerless_success(self, payload: PostPeerlessPixelSuccessHookPayload, config: Dict) -> None:
+        self.logger.info("peerless success")
 
+    def on_peerless_skip(self, payload: PostPeerlessPixelSkipHookPayload, config: Dict) -> None:
+        self.logger.info("peerless skip")
 
-def on_run_pixel_success(*args, **kwargs):
-    logging.info("[TEST PLUGIN] run pixel success")
-    return kwargs
+    def on_run_pixel_success(self, payload: PostRunPixelSuccessHookPayload, config: Dict) -> None:
+        self.logger.info("run pixel success")
 
+    def on_run_pixel_failed(self, payload: PostRunPixelFailedHookPayload, config: Dict) -> None:
+        self.logger.info("run pixel failed")
 
-def on_run_pixel_failed(*args, **kwargs):
-    logging.info("[TEST PLUGIN] run pixel failed")
-    return kwargs
+    def problematic_hook(self, payload: PostConfigHookPayload, config: Dict) -> None:
+        raise Exception("Testing plugin exception")

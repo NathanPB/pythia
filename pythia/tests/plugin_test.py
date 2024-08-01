@@ -1,5 +1,5 @@
-from pythia.plugin import (
-    PluginHook,
+from pythia.plugin.__init__ import (
+    HookType,
     register_plugin_function,
     load_plugins,
     run_plugin_functions,
@@ -15,7 +15,7 @@ def test_register_with_invalid_hook():
 def test_register_with_invalid_fun():
     plugins = {}
     plugins1 = register_plugin_function(
-        PluginHook.pre_analytics, "not a function", "", plugins
+        HookType.pre_analytics, "not a function", "", plugins
     )
     assert plugins1 == {}
 
@@ -23,7 +23,7 @@ def test_register_with_invalid_fun():
 def test_register_with_invalid_config():
     plugins = {}
     plugins1 = register_plugin_function(
-        PluginHook.post_analytics, sample_function, "", plugins
+        HookType.post_analytics, sample_function, "", plugins
     )
     assert plugins1 == {}
 
@@ -33,13 +33,13 @@ def test_register_twice():
     plugins1 = {}
     plugins2 = {}
     plugins1 = register_plugin_function(
-        PluginHook.pre_analytics, sample_function, {}, plugins
+        HookType.pre_analytics, sample_function, {}, plugins
     )
     plugins2 = register_plugin_function(
-        PluginHook.pre_analytics, sample_function, {"a": 1}, plugins1
+        HookType.pre_analytics, sample_function, {"a": 1}, plugins1
     )
     assert plugins1 == {
-        PluginHook.pre_analytics: [{"fun": sample_function, "config": {}}]
+        HookType.pre_analytics: [{"fun": sample_function, "config": {}}]
     }
     assert plugins1 == plugins2
 
@@ -48,10 +48,10 @@ def test_register_properly():
     plugins = {}
     plugins1 = {}
     plugins1 = register_plugin_function(
-        PluginHook.post_build_context, sample_function, {}, plugins
+        HookType.post_build_context, sample_function, {}, plugins
     )
     assert plugins1 == {
-        PluginHook.post_build_context: [{"fun": sample_function, "config": {}}]
+        HookType.post_build_context: [{"fun": sample_function, "config": {}}]
     }
 
 
@@ -66,12 +66,12 @@ def test_load_plugin():
     plugins = {}
     plugins1 = {}
     plugins1 = load_plugins(config, plugins)
-    assert PluginHook.post_config in plugins1
-    assert plugins1[PluginHook.post_config] == [
+    assert HookType.post_config in plugins1
+    assert plugins1[HookType.post_config] == [
         {"fun": pythia.plugins.test_plugin.sample_function, "config": {}}
     ]
     assert plugins1 != {
-        PluginHook.post_config: [{"fun": sample_function, "config": {}}]
+        HookType.post_config: [{"fun": sample_function, "config": {}}]
     }
 
 
@@ -81,7 +81,7 @@ def test_plugin_manual_execution():
     plugins1 = {}
     plugins1 = load_plugins(config, plugins)
 
-    for plugin in plugins1[PluginHook.post_config]:
+    for plugin in plugins1[HookType.post_config]:
         assert 1 == plugin["fun"]()
 
 
@@ -92,9 +92,9 @@ def test_plugin_auto_execution():
     plugins1 = load_plugins(config, plugins)
     context = {"context_value": 7}
     context1 = run_plugin_functions(
-        PluginHook.post_build_context, plugins1, context=context
+        HookType.post_build_context, plugins1, context=context
     ).get("context")
-    context2 = run_plugin_functions(PluginHook.post_build_context, plugins1).get("context", None)
+    context2 = run_plugin_functions(HookType.post_build_context, plugins1).get("context", None)
     assert context1 != context
     assert context1["context_value"] == 8
     assert context2["context_value"] == 3
@@ -106,11 +106,11 @@ def test_no_plugin_does_not_change_context():
     plugins1 = load_plugins(config, plugins)
     context = {"hello": "there"}
     context1 = run_plugin_functions(
-        PluginHook.post_build_context, plugins, context=context
+        HookType.post_build_context, plugins, context=context
     ).get("context")
     assert context == context1
     context2 = run_plugin_functions(
-        PluginHook.post_build_context, plugins1, context=context
+        HookType.post_build_context, plugins1, context=context
     ).get("context")
     assert context1 != context2
     assert context2 == {**context, **{"context_value": 3}}

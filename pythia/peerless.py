@@ -5,12 +5,15 @@ import os
 
 import pythia.functions
 import pythia.io
-import pythia.plugin
 import pythia.template
 import pythia.util
+from pythia.plugin import PluginManager
+from pythia.plugin.hooks import PostPeerlessPixelSkipHookPayload, PostPeerlessPixelSuccessHookPayload, \
+    PostBuildContextHookPayload, PostComposePeerlessPixelSuccessHookPayload, PostComposePeerlessPixelSkipHookPayload, \
+    PostComposePeerlessAllHookPayload
 
 
-def build_context(run, ctx, config, plugins):
+def build_context(run, ctx, config, plugins: PluginManager):
     if not config["silence"]:
         print("+", end="", flush=True)
     context = run.copy()
@@ -28,16 +31,12 @@ def build_context(run, ctx, config, plugins):
                     context = None
                     break
 
-    hook = pythia.plugin.PluginHook.post_peerless_pixel_success
     if context is None:
-        hook = pythia.plugin.PluginHook.post_peerless_pixel_skip
-
-    context = pythia.plugin.run_plugin_functions(
-        hook,
-        plugins,
-        context=context,
-        args={"run": run, "config": config, "ctx": ctx},
-    ).get("context", context)
+        payload = PostPeerlessPixelSkipHookPayload({"run": run, "config": config, "ctx": ctx})
+        plugins.notify_hook(payload)
+    else:
+        payload = PostPeerlessPixelSuccessHookPayload(context, {"run": run, "config": config, "ctx": ctx})
+        plugins.notify_hook(payload)
 
     return context
 
@@ -81,39 +80,21 @@ def compose_peerless(context, config, env):
     return context["contextWorkDir"]
 
 
-def process_context(context, plugins, config, env):
+def process_context(context, plugins: PluginManager, config, env):
     if context is not None:
         pythia.io.make_run_directory(context["contextWorkDir"])
-        # Post context hook
         logging.debug("[PEERLESS] Running post_build_context plugins")
-        context = pythia.plugin.run_plugin_functions(
-            pythia.plugin.PluginHook.post_build_context,
-            plugins,
-            context=context,
-        ).get("context", context)
+        plugins.notify_hook(PostBuildContextHookPayload(context))
         compose_peerless_result = compose_peerless(context, config, env)
-        compose_peerless_result = pythia.plugin.run_plugin_functions(
-            pythia.plugin.PluginHook.post_compose_peerless_pixel_success,
-            plugins,
-            context=context,
-            compose_peerless_result=compose_peerless_result,
-            config=config,
-            env=env,
-        ).get("compose_peerless_result", compose_peerless_result)
+        plugins.notify_hook(PostComposePeerlessPixelSuccessHookPayload(context))
         return os.path.abspath(compose_peerless_result)
     else:
-        pythia.plugin.run_plugin_functions(
-            pythia.plugin.PluginHook.post_compose_peerless_pixel_skip,
-            plugins,
-            context=context,
-            config=config,
-            env=env,
-        )
+        plugins.notify_hook(PostComposePeerlessPixelSkipHookPayload())
         if not config["silence"]:
             print("X", end="", flush=True)
 
 
-def execute(config, plugins):
+def execute(config, plugins: PluginManager):
     runs = config.get("runs", [])
     if len(runs) == 0:
         return
@@ -145,10 +126,4 @@ def execute(config, plugins):
         with open(os.path.join(config["workDir"], "run_list.txt"), "w") as f:
             [f.write(f"{x}\n") for x in runlist]
 
-    pythia.plugin.run_plugin_functions(
-        pythia.plugin.PluginHook.post_compose_peerless_all,
-        plugins,
-        run_list=runlist,
-        config=config,
-        env=env,
-    )
+    plugins.notify_hook(PostComposePeerlessAllHookPayload(runlist))

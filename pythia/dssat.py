@@ -2,14 +2,16 @@ import logging
 import multiprocessing as mp
 import os
 import subprocess
-from multiprocessing.pool import Pool
 
-import pythia.plugin
+from typing import List
+from multiprocessing.pool import Pool
+from pythia.plugin import PluginManager
+from pythia.plugin.hooks import PostRunPixelFailedHookPayload, PostRunPixelSuccessHookPayload, PostRunAllHookPayload
 
 async_error = False
 
 
-def _run_dssat(details, config, plugins):
+def _run_dssat(details, config, plugins: PluginManager) -> (str, str, bytes, bytes, int):
     logging.debug("Current WD: {}".format(os.getcwd()))
     run_mode = "A"
     if "run_mode" in config["dssat"]:
@@ -25,21 +27,16 @@ def _run_dssat(details, config, plugins):
     # print("+", end="", flush=True)
 
     error_count = len(out.decode().split("\n")) - 1
-    hook = pythia.plugin.PluginHook.post_run_pixel_success
+
     if error_count > 0:
-        hook = pythia.plugin.PluginHook.post_run_pixel_failed
+        plugins.notify_hook(PostRunPixelFailedHookPayload(details, out, err, dssat.returncode))
+    else:
+        plugins.notify_hook(PostRunPixelSuccessHookPayload(details, out, err, dssat.returncode))
 
-    plugin_transform = pythia.plugin.run_plugin_functions(
-        hook,
-        plugins,
-        input={"details": details, "config": config},
-        output={"loc": details["dir"], "xfile": details["file"], "out": out, "err": err, "retcode": dssat.returncode}
-    ).get("output", {})
-
-    return plugin_transform.get("loc", details["dir"]), plugin_transform.get("xfile", details["file"]), plugin_transform.get("out", out), plugin_transform.get("err", err), plugin_transform.get("retcode", dssat.returncode)
+    return details["dir"], details["file"], out, err, dssat.returncode
 
 
-def _generate_run_list(config):
+def _generate_run_list(config) -> List[{"dir": str, "file": str}]:
     runlist = []
     for root, _, files in os.walk(config.get("workDir", "."), topdown=False):
         batch_mode = config["dssat"].get("run_mode", "A") in {
@@ -101,7 +98,7 @@ def silent_async(details):
         async_error = True
 
 
-def execute(config, plugins):
+def execute(config, plugins: PluginManager):
     pool_size = config.get("cores", mp.cpu_count())
     run_list = _generate_run_list(config)
     with Pool(processes=pool_size) as pool:
@@ -118,9 +115,4 @@ def execute(config, plugins):
             "\nOne or more simulations had failures. Please check the pythia log for more details"
         )
 
-    pythia.plugin.run_plugin_functions(
-        pythia.plugin.PluginHook.post_run_all,
-        plugins,
-        config=config,
-        run_list=run_list,
-    )
+    plugins.notify_hook(PostRunAllHookPayload(run_list))

@@ -8,8 +8,10 @@ from rasterio.io import DatasetReader
 import pythia.analytic_functions
 import pythia.io
 import pythia.util
-import pythia.plugin
 from contextlib import _GeneratorContextManager
+
+from pythia.plugin import PluginManager
+from pythia.plugin.hooks import PreAnalyticsHookPayload, PostAnalyticsHookPayload
 
 
 def get_run_basedir(config, run):
@@ -248,7 +250,7 @@ def collate_outputs(config, run):
     return out_file
 
 
-def execute(config, plugins):
+def execute(config, plugins: PluginManager):
     runs = config.get("runs", [])
     analytics_config = config.get("analytics_setup", None)
 
@@ -256,11 +258,7 @@ def execute(config, plugins):
         logging.warning("Skipping analytics: no configuration or runs found.")
         return
 
-    pythia.plugin.run_plugin_functions(
-        pythia.plugin.PluginHook.pre_analytics,
-        plugins,
-        config=config,
-    )
+    plugins.notify_hook(PreAnalyticsHookPayload())
 
     run_outputs = []
     calculated = None
@@ -282,11 +280,4 @@ def execute(config, plugins):
     else:
         final_outputs(config, filtered)
 
-    pythia.plugin.run_plugin_functions(
-        pythia.plugin.PluginHook.post_analytics,
-        plugins,
-        config=config,
-        run_outputs=run_outputs,
-        calculated=calculated,
-        filtered=filtered,
-    )
+    plugins.notify_hook(PostAnalyticsHookPayload(run_outputs, calculated, filtered))
