@@ -99,10 +99,7 @@ def generate_ic_layers(k, run, context, _):
         profile = args[0][1:]
     else:
         profile = args[0]
-    soil_file = pythia.soil_handler.findSoilProfile(
-        context[profile], context["soilFiles"]
-    )
-    layers = pythia.soil_handler.readSoilLayers(context[profile], soil_file)
+    layers = pythia.soil_handler.read_soil_layers(context[profile], context["soilFiles"])
     calculated_layers = pythia.soil_handler.calculateICLayerData(layers, run)
     layer_labels = ["icbl", "sh2o", "snh4", "sno3"]
     return {k: [dict(zip(layer_labels, cl)) for cl in calculated_layers]}

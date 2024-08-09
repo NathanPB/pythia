@@ -14,16 +14,6 @@ def read_soil_profile_file_lines(soil_file: str) -> List[str]:
         return [line.strip() for line in f]
 
 
-def findSoilProfile(profile, soilFiles):
-    profile = "*{}".format(profile)
-    for sf in soilFiles:
-        for file in soilFiles:
-            for line in read_soil_profile_lines(file):
-                if line.startswith(profile):
-                    return sf
-    return None
-
-
 def transpose(listOfLists):
     return list(map(list, zip(*listOfLists)))
 
@@ -33,18 +23,29 @@ def formatSoilData(header, current_data):
     return {k: v for k, v in zip(header, transposed)}
 
 
-def readSoilLayers(profile, soilFile):
+def read_soil_layers(profile: str, soil_files: List[str]):
+    """
+    Searches for the specified soil profile in the list of soil files and returns the soil layers of that profile.
+    :param profile: The ID of the soil profile to read.
+    :param soil_files: The list of all soil files to search through.
+    :return: The soil layers of the specified soil profile.
+    """
     profile = "*{}".format(profile)
     profilelines = []
     found = False
-    for line in read_soil_profile_file_lines(soilFile):
-        line = line.strip()
-        if line.startswith(profile):
-            found = True
-        if found and line == "":
-            found = False
+
+    for soilFile in soil_files:
         if found:
-            profilelines.append(line)
+            break
+        for line in read_soil_profile_file_lines(soilFile):
+            line = line.strip()
+            if line.startswith(profile):
+                found = True
+            if found and line == "":
+                break
+            if found:
+                profilelines.append(line)
+
     in_data = False
     current_data = []
     header = []
