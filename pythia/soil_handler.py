@@ -1,8 +1,24 @@
+from typing import List
+from functools import lru_cache
+
+
+@lru_cache(maxsize=8)
+def read_soil_profile_file_lines(soil_file: str) -> List[str]:
+    """
+    Reads a soil profile file and returns a list whitespace-stripped lines of the file.
+    This function uses functools.lru_cache (size is hardcoded to 8) to avoid reading the file multiple times.
+    :param soil_file: The path to the soil profile file.
+    :return: A list of whitespace-stripped lines from the soil profile file.
+    """
+    with open(soil_file) as f:
+        return [line.strip() for line in f]
+
+
 def findSoilProfile(profile, soilFiles):
     profile = "*{}".format(profile)
     for sf in soilFiles:
-        with open(sf) as f:
-            for line in f:
+        for file in soilFiles:
+            for line in read_soil_profile_lines(file):
                 if line.startswith(profile):
                     return sf
     return None
@@ -21,15 +37,14 @@ def readSoilLayers(profile, soilFile):
     profile = "*{}".format(profile)
     profilelines = []
     found = False
-    with open(soilFile) as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith(profile):
-                found = True
-            if found and line == "":
-                found = False
-            if found:
-                profilelines.append(line)
+    for line in read_soil_profile_file_lines(soilFile):
+        line = line.strip()
+        if line.startswith(profile):
+            found = True
+        if found and line == "":
+            found = False
+        if found:
+            profilelines.append(line)
     in_data = False
     current_data = []
     header = []
